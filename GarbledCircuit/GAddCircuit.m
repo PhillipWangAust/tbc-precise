@@ -1,0 +1,159 @@
+classdef GAddCircuit
+    properties
+        NumOfBits
+        LengthOfKeys
+        GHalfAdder
+        GAdder
+    end
+    methods
+%         function obj = GAddCircuit(MAC)
+%             [NumOfBits1 LengthOfMAC] = size(MAC);
+%             if LengthOfMAC ~= 64
+%                 error('This length of MAC must be 64 bits');
+%             end
+%             obj.NumOfBits = NumOfBits1;
+%             obj.GHalfAdder = HalfAdder(MAC(1,:));
+%             for m = 1:(NumOfBits1 - 1)
+%                 obj.GAdder{m} = Adder(MAC(m+1,:));
+%             end
+%         end
+        
+        function obj = GAddCircuit(NumOfBits, LengthOfKeys)
+            MAC = logical(round(rand(NumOfBits, LengthOfKeys)));
+            obj.NumOfBits = NumOfBits;
+            obj.LengthOfKeys = LengthOfKeys;
+            obj.GHalfAdder = HalfAdder(MAC(1,:));
+            for m = 1:(NumOfBits - 1)
+                obj.GAdder{m} = Adder(MAC(m+1,:));
+            end
+        end
+        
+        function NumOfKeys = getNumOfKeys(obj)
+            NumOfKeys = 2 * (4 + (obj.NumOfBits - 1)*7);
+        end
+        
+        function obj = initializeKeys(obj, Keys)
+            [NumOfKeys LengthOfKey] = size(Keys);
+            if NumOfKeys ~= obj.getNumOfKeys() || LengthOfKey ~= 64
+                error('The provided keys are error!');
+            end
+            obj.GHalfAdder = obj.GHalfAdder.setEncTrueTable(Keys(1:8,:));
+            for m = 1:(obj.NumOfBits - 1)
+                obj.GAdder{m} = obj.GAdder{m}.setEncTrueTable(Keys((7 + (m-1)*14):(8 + m * 14),:));
+            end
+        end
+        
+        function obj = initializeKeysForAAndB(obj, InputA, InputB, OutputS)            
+            if size(InputA,1) ~= size(InputB,1) || size(InputA,2) ~= size(InputB,2)
+                error('The provided keys are error!');
+            end
+            Keys = logical(round(rand(obj.getNumOfKeys(), obj.LengthOfKeys)));
+            Keys = GAddCircuit.setKeysOfInputA(Keys, InputA);
+            Keys = GAddCircuit.setKeysOfInputB(Keys, InputB);
+            Keys = GAddCircuit.setKeysOfOutputS(Keys, OutputS);
+            
+            
+            obj.GHalfAdder = obj.GHalfAdder.setEncTrueTable(Keys(1:8,:));
+            for m = 1:(obj.NumOfBits - 1)
+                obj.GAdder{m} = obj.GAdder{m}.setEncTrueTable(Keys((7 + (m-1)*14):(8 + m * 14),:));
+            end
+        end
+        
+        function OutputGarbles = getGarbledOutput(obj, InputA, InputB)
+            [OutputS OutputC] = obj.GHalfAdder.getSAndC(InputA(1,:),InputB(1,:));
+            OutputGarbles(1,:)  = OutputS;
+            C_in_out = OutputC;
+            for m = 1:(obj.NumOfBits - 1)
+                [OutputS C_in_out] = obj.GAdder{m}.getSAndC(C_in_out, InputA(m+1,:), InputB(m+1,:));
+                OutputGarbles(m+1,:)  = OutputS;
+            end
+        end
+    end
+    methods(Static)
+        function [KeysOfInputA KeysOfInputB KeysOfOutputS] = getKeysOfInputAAndB(Keys)
+            NumOfKeys = size(Keys);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            KeysOfInputA(1:2,:) = Keys(1:2,:);
+            KeysOfInputB(1:2,:) = Keys(3:4,:);
+            KeysOfOutputS(1:2,:)= Keys(5:6,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                KeysOfInputA((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*14 + 1):(8 + (m - 1)*14 + 2),:);
+                KeysOfInputB((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*14 + 3):(8 + (m - 1)*14 + 4),:);
+                KeysOfOutputS((2*m+1):(2*m+2),:) = Keys((5+14*m):(6+14*m),:);
+            end
+        end
+        
+        function KeysOfInputA = getKeysOfInputA(Keys)
+            NumOfKeys = size(Keys);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            KeysOfInputA(1:2,:) = Keys(1:2,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                KeysOfInputA((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*14 + 1):(8 + (m - 1)*14 + 2),:);
+            end
+        end
+        
+        function KeysOfInputB = getKeysOfInputB(Keys)
+            NumOfKeys = size(Keys);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            KeysOfInputB(1:2,:) = Keys(3:4,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                KeysOfInputB((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*14 + 3):(8 + (m - 1)*14 + 4),:);
+            end
+        end
+        
+        function KeysOfOutputS = getKeysOfOutputS(Keys)
+            NumOfKeys = size(Keys);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            KeysOfOutputS(1:2,:)= Keys(5:6,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                KeysOfOutputS((2*m+1):(2*m+2),:) = Keys((5+14*m):(6+14*m),:);
+            end
+        end
+        
+        function [Keys] = setKeysOfInputA(Keys, InputA)
+            NumOfKeys = size(Keys,1);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            if 2*NumOfBits1 ~= size(InputA,1)
+                errors('Input Keys doesnot match orignal keys!');
+            end
+
+            Keys(1:2,:) = InputA(1:2,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                Keys((8 + (m - 1)*14 + 1):(8 + (m - 1)*14 + 2),:) = InputA((2*m+1):(2*m + 2),:);
+            end
+        end
+        
+        function Keys = setKeysOfInputB(Keys, InputB)
+            NumOfKeys = size(Keys,1);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            if 2*NumOfBits1 ~= size(InputB,1)
+                errors('Input Keys doesnot match orignal keys!');
+            end
+
+            Keys(3:4,:) = InputB(1:2,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                Keys((8 + (m - 1)*14 + 3):(8 + (m - 1)*14 + 4),:) = InputB((2*m+1):(2*m + 2),:);
+            end
+        end
+        
+        function Keys = setKeysOfOutputS(Keys, OutputS)
+            NumOfKeys = size(Keys,1);
+            NumOfBits1 = (NumOfKeys/2 - 4)/7 + 1;
+            if 2*NumOfBits1 ~= size(OutputS,1)
+                errors('Input Keys doesnot match orignal keys!');
+            end
+
+            Keys(5:6,:) = OutputS(1:2,:);
+
+            for m = 1:(NumOfBits1 - 1)
+                Keys((5+14*m):(6+14*m),:) = OutputS((2*m+1):(2*m + 2),:);
+            end
+        end
+    end
+end

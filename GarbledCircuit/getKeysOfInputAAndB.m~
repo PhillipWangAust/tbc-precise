@@ -1,0 +1,13 @@
+function [KeysOfInputA KeysOfInputB KeysOfOutputS] = getKeysOfInputAAndB(Keys)
+NumOfKeys = size(Keys);
+NumOfBits = (NumOfKeys/2 - 4)/7 + 1;
+KeysOfInputA(1:2,:) = Keys(1:2,:);
+KeysOfInputB(1:2,:) = Keys(3:4,:);
+KeysOfOutputS(1:2,:)= Keys(5:6,:);
+
+for m = 1:(NumOfBits - 1)
+    KeysOfInputA((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*16 + 1):(8 + (m - 1)*16 + 2),:);
+    KeysOfInputB((2*m+1):(2*m + 2),:) = Keys((8 + (m - 1)*16 + 3):(8 + (m - 1)*16 + 4),:);
+    KeysOfOutputS((2*m+1):(2*m+2),:) = Keys((5+14*m):(16*m-8),:);
+end
+end
